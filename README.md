@@ -56,3 +56,18 @@ npm run dev   # starts Vite (shows http://localhost:5173)
 # 3) Run Laravel
 php artisan serve  # http://127.0.0.1:8000
 
+APP_NAME="Rating-employee"
+APP_URL=http://127.0.0.1:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=rating_employee
+DB_USERNAME=root
+DB_PASSWORD=
+
+# Only if customizing Vite host/port:
+# VITE_DEV_SERVER_HOST=localhost
+# VITE_DEV_SERVER_PORT=5173
+
+
