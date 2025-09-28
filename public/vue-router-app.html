@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Management</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- Vue Router -->
+    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+    
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <!-- VeeValidate -->
+    <script src="https://unpkg.com/vee-validate@4/dist/vee-validate.global.js"></script>
+    
+    <!-- Bootstrap Vue -->
+    <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@2.23.1/dist/bootstrap-vue.css" />
+    <script src="https://unpkg.com/bootstrap-vue@2.23.1/dist/bootstrap-vue.js"></script>
+    
+    <!-- Sortable.js for drag and drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuedraggable@2.24.3/dist/vuedraggable.umd.min.js"></script>
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        .required::after {
+            content: " *";
+            color: red;
+        }
+        
+        .table th {
+            background-color: #f8f9fa;
+            border-top: none;
+            padding: 0.9rem;
+        }
+        
+        .table td {
+            border-bottom: none;
+            padding: 0.9rem;
+            background-color: transparent;
+        }
+        
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border: 1px solid rgba(0, 0, 0, 0.125);
+        }
+        
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <router-view></router-view>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        const { createRouter, createWebHistory } = VueRouter;
+        
+        // Department Manage Component (from Manage.vue)
+        const DepartmentManage = {
+            template: `
+                <div class="container-fluid mt-4">
+                    <b-overlay :show="show" rounded="sm">
+                        <b-card class="mb-4">
+                            <template #header>
+                                <h5 class="mb-0">Add Department</h5>
+                            </template>
+                            <validation-observer ref="submitform">
+                                <b-form enctype="multipart/form-data">
+                                    <b-row>
+                                        <b-col md="6">
+                                            <b-form-group>
+                                                <label class="required">Department Name</label>
+                                                <validation-provider
+                                                    #default="{ errors }"
+                                                    name="Department Name"
+                                                    rules="required"
+                                                >
+                                                    <b-form-input
+                                                        v-model="dept_name"
+                                                        :state="errors.length > 0 ? false : null"
+                                                        placeholder="Add Department Name"
+                                                    />
+                                                    <small class="text-danger">{{ errors[0] }}</small>
+                                                </validation-provider>
+                                            </b-form-group>
+                                        </b-col>
+                                    </b-row>
+
+                                    <b-row class="mt-1">
+                                        <b-col>
+                                            <b-button @click="resetData" variant="outline-secondary">
+                                                Cancel
+                                            </b-button>
+                                            <b-button
+                                                variant="primary"
+                                                class="float-right"
+                                                @click="validationForm"
+                                            >
+                                                {{ EditID !== '' ? 'Update' : 'Save' }}
+                                            </b-button>
+                                        </b-col>
+                                    </b-row>
+                                </b-form>
+                            </validation-observer>
+                        </b-card>
+
+                        <b-card title="Departments">
+                            <div>
+                                <table class="table-bordered table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center">ID</th>
+                                            <th class="text-center">Department Name</th>
+                                            <th class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <draggable
+                                        tag="tbody"
+                                        v-model="rows"
+                                        handle=".drag-handle"
+                                        :options="{ animation: 200, group: 'rows' }"
+                                    >
+                                        <tr v-for="(data, index) in rows" :key="data.id">
+                                            <td class="text-center">{{ data.id }}</td>
+                                            <td class="text-center">{{ data.dept_name }}</td>
+                                            <td class="text-center">
+                                                <b-button
+                                                    variant="primary"
+                                                    @click="change_edit(data.id)"
+                                                >Edit</b-button>
+                                                <b-button
+                                                    variant="danger"
+                                                    @click="sweetAlertDeleteMethod('/deleteDepartment', {'id': data.id, table: 'department'}, 'post')"
+                                                >Delete</b-button>
+                                            </td>
+                                        </tr>
+                                    </draggable>
+                                </table>
+                            </div>
+                        </b-card>
+                    </b-overlay>
+                </div>
+            `,
+            data() {
+                return {
+                    dept_name: '',
+                    fields: [
+                        { key: 'action', label: 'Action' },
+                        { key: 'dept_name', label: 'Department Name' },
+                    ],
+                    EditID: '',
+                    rows: [],
+                    searchTerm: '',
+                    show: false,
+                    save_data: '',
+                }
+            },
+            async created() {
+                this.DepartmentLoad();
+            },
+            methods: {
+                async DepartmentLoad() {
+                    const data_send = await this.callAxios('/getDepartments', {}, 'post');
+                    console.log('API Response:', data_send);
+                    console.log('Data:', data_send.data);
+                    this.rows = data_send.data;
+                    console.log('Rows after assignment:', this.rows);
+                },
+                resetData() {
+                    this.dept_name = this.EditID = '';
+                },
+                validationForm() {
+                    this.$refs.submitform.validate().then(async success => {
+                        if (success) {
+                            this.show = true;
+                            const data = new FormData();
+                            data.append('dept_name', this.dept_name);
+
+                            if (this.EditID) {
+                                data.append('id', this.EditID);
+                            }
+                            data.append('username', 'admin');
+                            
+                            const data_send = await this.callAxios('/saveDepartment', data, 'post');
+                            if (data_send.status === 200) {
+                                this.show = false;
+                                this.sweetAlertmethod(data_send.data.button, data_send.data.message, data_send.data.notify, 'btn-primary');
+                                this.dept_name = '';
+                                this.DepartmentLoad();
+                            } else {
+                                this.show = false;
+                                this.sweetAlertmethod(data_send.data.button, data_send.data.message, data_send.data.notify, 'btn-danger');
+                            }
+                        }
+                    });
+                },
+                async change_edit(id) {
+                    this.show = true;
+                    this.EditID = id;
+                    const data_send = await this.callAxios('/getSingleDepartment', { 'id': id }, 'post');
+                    this.dept_name = data_send.data.dept_name;
+                    this.DepartmentLoad();
+                    this.show = false;
+                },
+                async callAxios(url, data, method) {
+                    try {
+                        const response = await axios({
+                            method: method,
+                            url: url,
+                            data: data,
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                        return response.data;
+                    } catch (error) {
+                        console.error('API Error:', error);
+                        return {
+                            status: 500,
+                            data: {
+                                button: 'Error',
+                                message: 'Network error occurred',
+                                notify: 'error'
+                            }
+                        };
+                    }
+                },
+                sweetAlertmethod(title, text, icon, button) {
+                    Swal.fire({
+                        title: title,
+                        text: text,
+                        icon: icon,
+                        confirmButtonText: 'OK'
+                    });
+                },
+                sweetAlertDeleteMethod(url, data, method) {
+                    Swal.fire({
+                        title: 'Are you sure?',
+                        text: "You won't be able to revert this!",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#d33',
+                        cancelButtonColor: '#3085d6',
+                        confirmButtonText: 'Yes, delete it!'
+                    }).then(async (result) => {
+                        if (result.isConfirmed) {
+                            const data_send = await this.callAxios(url, data, method);
+                            if (data_send.status === 200) {
+                                this.sweetAlertmethod(data_send.data.button, data_send.data.message, data_send.data.notify, 'btn-success');
+                                this.DepartmentLoad();
+                            } else {
+                                this.sweetAlertmethod(data_send.data.button, data_send.data.message, data_send.data.notify, 'btn-danger');
+                            }
+                        }
+                    });
+                }
+            }
+        };
+
+        // Routes configuration (from routes.js)
+        const routes = [
+            {
+                path: '/departments',
+                name: 'Departments',
+                component: DepartmentManage
+            },
+            {
+                path: '/departments/manage',
+                name: 'DepartmentManage',
+                component: DepartmentManage
+            },
+            {
+                path: '/',
+                redirect: '/departments'
+            }
+        ];
+
+        // Create router
+        const router = createRouter({
+            history: createWebHistory(),
+            routes
+        });
+
+        // Create Vue app
+        const app = createApp({
+            template: '<router-view></router-view>'
+        });
+
+        // Use router and Bootstrap Vue
+        app.use(router);
+        app.use(BootstrapVue);
+
+        // Mount the app
+        app.mount('#app');
+    </script>
+</body>
+</html>
